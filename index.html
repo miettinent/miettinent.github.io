@@ -394,7 +394,7 @@
     function generateTimestamps() {
       const now = new Date();
       const stepMs = 5 * 60 * 1000;
-      const latestAvailableMs = Math.floor((now.getTime() - 10 * 60 * 1000) / stepMs) * stepMs;
+      const latestAvailableMs = Math.floor((now.getTime() - 5 * 60 * 1000) / stepMs) * stepMs;
 
       const stamps = [];
       for (let i = 12; i >= 0; i--) {
