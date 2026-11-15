@@ -352,10 +352,10 @@
     const EAST_FINLAND_CENTER = [62.8, 29.2];
     const DEFAULT_ZOOM = 7;
 
-    // FMI Tutkakuvan kattavuusalue WGS84:nä
+    // Web Mercator (EPSG:3857) rajat WGS84-asteina [latMin, lonMin], [latMax, lonMax]
     const RADAR_BOUNDS = [
-      [57.5, 17.0],
-      [71.5, 34.5]
+      [54.5, 13.5],
+      [72.0, 36.0]
     ];
 
     const map = L.map('map', {
@@ -365,7 +365,7 @@
       attributionControl: true
     });
 
-    // OpenStreetMap päivätila
+    // OpenStreetMap päivätila (EPSG:3857)
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 18,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> | Tutka: <a href="https://www.ilmatieteenlaitos.fi/avoin-data">Ilmatieteen laitos</a>'
@@ -411,14 +411,14 @@
     function buildFmiRadarUrl(isoTime) {
       const params = new URLSearchParams({
         SERVICE: 'WMS',
-        VERSION: '1.1.1',
+        VERSION: '1.3.0',
         REQUEST: 'GetMap',
         LAYERS: 'Radar:suomi_rr_eureffin',
         STYLES: '',
         FORMAT: 'image/png',
         TRANSPARENT: 'true',
-        SRS: 'EPSG:4326',
-        BBOX: '17.0,57.5,34.5,71.5',
+        CRS: 'EPSG:3857',
+        BBOX: '1500000,7500000,4000000,11200000',
         WIDTH: '1200',
         HEIGHT: '1400',
         TIME: isoTime
