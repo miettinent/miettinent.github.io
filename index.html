@@ -352,10 +352,10 @@
     const EAST_FINLAND_CENTER = [62.8, 29.2];
     const DEFAULT_ZOOM = 7;
 
-    // FMI Tutkakuvan kattavuusalue (Suomi & lähialueet, WGS84)
+    // FMI Tutkakuvan tarkat ETRS-TM35FIN (EPSG:3067) rajat
     const RADAR_BOUNDS = [
-      [57.5, 17.0],
-      [71.5, 34.5]
+      [59.0, 10.0],
+      [69.0, 36.0]
     ];
 
     const map = L.map('map', {
@@ -378,6 +378,8 @@
     // Tilailmoitusten näyttäminen
     const toastEl = document.getElementById('status-toast');
     let toastTimeout = null;
+    let initialToastShown = false;
+
     function showToast(message, isError = false, duration = 4500) {
       toastEl.textContent = message;
       toastEl.classList.toggle('error', isError);
@@ -415,10 +417,10 @@
         STYLES: '',
         FORMAT: 'image/png',
         TRANSPARENT: 'true',
-        SRS: 'EPSG:4326',
-        BBOX: '17.0,57.5,34.5,71.5',
-        WIDTH: '1200',
-        HEIGHT: '1400',
+        SRS: 'EPSG:3067',
+        BBOX: '-100000,6200000,900000,7800000',
+        WIDTH: '1000',
+        HEIGHT: '1000',
         TIME: isoTime
       });
       return `https://openwms.fmi.fi/geoserver/Radar/wms?${params.toString()}`;
@@ -551,6 +553,10 @@
 
           if (openPopupOnLocate) {
             userMarker.openPopup();
+            showToast('Sijainti päivitetty', false, 2000);
+          } else if (!initialToastShown) {
+            initialToastShown = true;
+            showToast('Paikannettu onnistuneesti', false, 2500);
           }
 
           map.flyTo(latlng, targetZoom, { duration: 1.0 });
@@ -586,3 +592,4 @@
   </script>
 </body>
 </html>
+                
