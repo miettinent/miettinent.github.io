@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Sadetutka – Viimeisen tunnin sadehavainnot</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+    }
+
+    #map {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1;
+      background-color: #e2e8f0;
+    }
+
+    /* Yläreunan hakupalkki */
+    .search-bar-container {
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1001;
+      width: calc(100% - 32px);
+      max-width: 480px;
+    }
+
+    .search-form {
+      display: flex;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.96);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid #cbd5e1;
+      border-radius: 14px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+      padding: 4px 6px 4px 14px;
+      gap: 6px;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .search-form:focus-within {
+      border-color: #0284c7;
+      box-shadow: 0 8px 24px rgba(2, 132, 199, 0.18);
+    }
+
+    .search-input {
+      flex: 1;
+      border: none;
+      background: transparent;
+      font-size: 0.95rem;
+      color: #0f172a;
+      outline: none;
+      min-width: 0;
+      padding: 8px 0;
+    }
+
+    .search-input::placeholder {
+      color: #94a3b8;
+    }
+
+    .clear-btn {
+      border: none;
+      background: transparent;
+      color: #94a3b8;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 1.1rem;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+
+    .clear-btn:hover {
+      background: #f1f5f9;
+      color: #334155;
+    }
+
+    .search-submit-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #0284c7;
+      color: #ffffff;
+      border: none;
+      border-radius: 10px;
+      padding: 8px 14px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s ease;
+      white-space: nowrap;
+    }
+
+    .search-submit-btn:hover {
+      background: #0369a1;
+    }
+
+    .search-submit-btn:disabled {
+      opacity: 0.65;
+      cursor: wait;
+    }
+
+    /* Tilailmoitus hakupalkin alla */
+    #status-toast {
+      position: fixed;
+      top: 74px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-12px);
+      z-index: 1000;
+      background: rgba(255, 255, 255, 0.96);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid #cbd5e1;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
+      color: #0f172a;
+      padding: 9px 16px;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      max-width: 90vw;
+      text-align: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+
+    #status-toast.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    #status-toast.error {
+      border-color: #fca5a5;
+      background: #fef2f2;
+      color: #991b1b;
+    }
+
+    /* Oikean reunan kelluvat työkalupainikkeet */
+    .map-controls-right {
+      position: fixed;
+      right: 16px;
+      bottom: 112px;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .control-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid #cbd5e1;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1);
+      color: #1e293b;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .control-btn:hover {
+      background: #ffffff;
+      border-color: #94a3b8;
+      transform: translateY(-1px);
+    }
+
+    .control-btn:active {
+      transform: scale(0.96);
+    }
+
+    .control-btn.locating {
+      color: #0284c7;
+      border-color: #38bdf8;
+      animation: pulse-ring 1.2s infinite;
+    }
+
+    @keyframes pulse-ring {
+      0% { box-shadow: 0 0 0 0 rgba(2, 132, 199, 0.4); }
+      70% { box-shadow: 0 0 0 10px rgba(2, 132, 199, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(2, 132, 199, 0); }
+    }
+
+    .zoom-group {
+      display: flex;
+      flex-direction: column;
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1);
+      overflow: hidden;
+    }
+
+    .zoom-group button {
+      width: 42px;
+      height: 40px;
+      border: none;
+      background: transparent;
+      color: #1e293b;
+      font-size: 1.25rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s ease;
+    }
+
+    .zoom-group button:hover {
+      background: #f1f5f9;
+    }
+
+    .zoom-group button:first-child {
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    /* Alareunan aikajanapalkki */
+    .timeline-bar {
+      position: fixed;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      width: calc(100% - 32px);
+      max-width: 640px;
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid #cbd5e1;
+      border-radius: 16px;
+      box-shadow: 0 8px 28px rgba(15, 23, 42, 0.12);
+      padding: 12px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .timeline-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .time-info {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+
+    #current-time-label {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #0f172a;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #relative-time-label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #0284c7;
+      background: #e0f2fe;
+      padding: 2px 8px;
+      border-radius: 6px;
+    }
+
+    .refresh-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      color: #334155;
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 6px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .refresh-btn:hover {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+
+    .refresh-btn.spinning svg {
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Aikajanan liukusäädin */
+    .slider-container {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 8px;
+      background: #e2e8f0;
+      border-radius: 999px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #0284c7;
+      border: 3px solid #ffffff;
+      box-shadow: 0 2px 6px rgba(2, 132, 199, 0.45);
+      cursor: pointer;
+      transition: transform 0.1s ease;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.1);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #0284c7;
+      border: 3px solid #ffffff;
+      box-shadow: 0 2px 6px rgba(2, 132, 199, 0.45);
+      cursor: pointer;
+    }
+
+    .slider-ticks {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.72rem;
+      color: #64748b;
+      font-weight: 500;
+      padding: 0 2px;
+    }
+
+    /* Sijaintipisteen tyyli */
+    .user-location-dot {
+      width: 16px;
+      height: 16px;
+      background: #0284c7;
+      border: 3px solid #ffffff;
+      border-radius: 50%;
+      box-shadow: 0 0 0 4px rgba(2, 132, 199, 0.3);
+    }
+
+    .leaflet-control-attribution {
+      background: rgba(255, 255, 255, 0.8) !important;
+      font-size: 10px !important;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="search-bar-container">
+    <form id="search-form" class="search-form">
+      <input
+        type="text"
+        id="search-input"
+        class="search-input"
+        value="Lippahivontie"
+        placeholder="Hae osoitetta tai paikkakuntaa..."
+        aria-label="Hae osoitetta tai paikkakuntaa"
+        autocomplete="off"
+      />
+      <button type="button" id="clear-search-btn" class="clear-btn" title="Tyhjennä haku" aria-label="Tyhjennä haku">&times;</button>
+      <button type="submit" id="search-submit-btn" class="search-submit-btn">Hae</button>
+    </form>
+  </div>
+
+  <div id="map"></div>
+
+  <div id="status-toast" role="status" aria-live="polite"></div>
+
+  <div class="map-controls-right">
+    <button id="locate-btn" class="control-btn" title="Keskitä omaan sijaintiin (selaimen paikannus)" aria-label="Keskitä omaan sijaintiin">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
+      </svg>
+    </button>
+
+    <div class="zoom-group">
+      <button id="zoom-in" title="Lähennä" aria-label="Lähennä">+</button>
+      <button id="zoom-out" title="Loitonna" aria-label="Loitonna">−</button>
+    </div>
+  </div>
+
+  <div class="timeline-bar">
+    <div class="timeline-header">
+      <div class="time-info">
+        <span id="current-time-label">--:--</span>
+        <span id="relative-time-label">Uusin</span>
+      </div>
+      <button id="refresh-btn" class="refresh-btn" title="Päivitä tutkakuvat">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+          <path d="M3 3v5h5"></path>
+          <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path>
+          <path d="M16 16h5v5"></path>
+        </svg>
+        <span>Päivitä</span>
+      </button>
+    </div>
+
+    <div class="slider-container">
+      <input type="range" id="time-slider" min="0" max="12" value="12" step="1" aria-label="Aikajana" />
+      <div class="slider-ticks">
+        <span>-60 min</span>
+        <span>-45 min</span>
+        <span>-30 min</span>
+        <span>-15 min</span>
+        <span>Uusin</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script>
+    const EAST_FINLAND_CENTER = [62.8, 29.2];
+    const DEFAULT_ZOOM = 7;
+
+    // FMI Tutkakuvan kattavuusalue (Suomi & lähialueet, WGS84)
+    const RADAR_BOUNDS = [
+      [57.5, 17.0],
+      [71.5, 34.5]
+    ];
+
+    const map = L.map('map', {
+      center: EAST_FINLAND_CENTER,
+      zoom: DEFAULT_ZOOM,
+      zoomControl: false,
+      attributionControl: true
+    });
+
+    // OpenStreetMap päivätila
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> | Tutka: <a href="https://www.ilmatieteenlaitos.fi/avoin-data">Ilmatieteen laitos</a>'
+    }).addTo(map);
+
+    // Zoom-painikkeet
+    document.getElementById('zoom-in').addEventListener('click', () => map.zoomIn());
+    document.getElementById('zoom-out').addEventListener('click', () => map.zoomOut());
+
+    // Tilailmoitusten näyttäminen
+    const toastEl = document.getElementById('status-toast');
+    let toastTimeout = null;
+    function showToast(message, isError = false, duration = 4500) {
+      toastEl.textContent = message;
+      toastEl.classList.toggle('error', isError);
+      toastEl.classList.add('visible');
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toastEl.classList.remove('visible');
+      }, duration);
+    }
+
+    // Laskee 13 aikaleimaa 5 min välein viimeisen tunnin ajalta
+    function generateTimestamps() {
+      const now = new Date();
+      const stepMs = 5 * 60 * 1000;
+      const latestAvailableMs = Math.floor((now.getTime() - 10 * 60 * 1000) / stepMs) * stepMs;
+
+      const stamps = [];
+      for (let i = 12; i >= 0; i--) {
+        const d = new Date(latestAvailableMs - i * stepMs);
+        stamps.push({
+          date: d,
+          iso: d.toISOString().replace(/\.\d{3}Z$/, 'Z'),
+          offsetMin: -i * 5
+        });
+      }
+      return stamps;
+    }
+
+    function buildFmiRadarUrl(isoTime) {
+      const params = new URLSearchParams({
+        SERVICE: 'WMS',
+        VERSION: '1.1.1',
+        REQUEST: 'GetMap',
+        LAYERS: 'Radar:suomi_rr_eureffin',
+        STYLES: '',
+        FORMAT: 'image/png',
+        TRANSPARENT: 'true',
+        SRS: 'EPSG:4326',
+        BBOX: '17.0,57.5,34.5,71.5',
+        WIDTH: '1200',
+        HEIGHT: '1400',
+        TIME: isoTime
+      });
+      return `https://openwms.fmi.fi/geoserver/Radar/wms?${params.toString()}`;
+    }
+
+    let timestamps = [];
+    let radarLayers = [];
+    let activeIndex = 12;
+
+    const slider = document.getElementById('time-slider');
+    const timeLabel = document.getElementById('current-time-label');
+    const relLabel = document.getElementById('relative-time-label');
+
+    function formatLocalTime(date) {
+      return date.toLocaleTimeString('fi-FI', {
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+
+    function updateTimeDisplay(index) {
+      const item = timestamps[index];
+      if (!item) return;
+
+      timeLabel.textContent = formatLocalTime(item.date);
+      if (item.offsetMin === 0) {
+        relLabel.textContent = 'Uusin';
+      } else {
+        relLabel.textContent = `${item.offsetMin} min`;
+      }
+    }
+
+    function showFrame(index) {
+      activeIndex = index;
+      radarLayers.forEach((layer, i) => {
+        if (i === index) {
+          layer.setOpacity(0.82);
+        } else {
+          layer.setOpacity(0);
+        }
+      });
+      updateTimeDisplay(index);
+    }
+
+    function loadRadarFrames() {
+      radarLayers.forEach(layer => map.removeLayer(layer));
+      radarLayers = [];
+
+      timestamps = generateTimestamps();
+      let errorCount = 0;
+
+      timestamps.forEach((item, index) => {
+        const url = buildFmiRadarUrl(item.iso);
+        const overlay = L.imageOverlay(url, RADAR_BOUNDS, {
+          opacity: index === activeIndex ? 0.82 : 0,
+          interactive: false,
+          zIndex: 200 + index
+        });
+
+        overlay.on('error', () => {
+          errorCount++;
+          if (errorCount === timestamps.length) {
+            showToast('Ilmatieteen laitoksen tutkakuvia ei voitu ladata juuri nyt.', true, 6000);
+          }
+        });
+
+        overlay.addTo(map);
+        radarLayers.push(overlay);
+      });
+
+      slider.value = activeIndex;
+      updateTimeDisplay(activeIndex);
+    }
+
+    slider.addEventListener('input', (e) => {
+      const idx = parseInt(e.target.value, 10);
+      showFrame(idx);
+    });
+
+    // Päivityspainike
+    const refreshBtn = document.getElementById('refresh-btn');
+    refreshBtn.addEventListener('click', () => {
+      refreshBtn.classList.add('spinning');
+      activeIndex = 12;
+      loadRadarFrames();
+      showToast('Tutkakuvat päivitetty', false, 2500);
+      setTimeout(() => refreshBtn.classList.remove('spinning'), 700);
+    });
+
+    // Karttaneula osoite-/paikkakuntahaulle
+    const pinIcon = L.divIcon({
+      className: '',
+      html: `<div style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;background:#e11d48;border:3px solid #ffffff;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 3px 10px rgba(225,29,72,0.45);">
+               <div style="width:8px;height:8px;background:#ffffff;border-radius:50%;transform:rotate(45deg);"></div>
+             </div>`,
+      iconSize: [28, 28],
+      iconAnchor: [14, 28]
+    });
+
+    let searchMarker = null;
+    const FALLBACK_LIPPAHIVONTIE = [62.7661, 29.7470];
+
+    function setSearchMarker(lat, lon, panToLocation = true, targetZoom = 10) {
+      if (searchMarker) {
+        map.removeLayer(searchMarker);
+      }
+      searchMarker = L.marker([lat, lon], { icon: pinIcon, interactive: false }).addTo(map);
+      if (panToLocation) {
+        map.flyTo([lat, lon], targetZoom, { duration: 1.0 });
+      }
+    }
+
+    async function geocodeAndPlace(query, panToLocation = true) {
+      const trimmed = query.trim();
+      if (!trimmed) return;
+
+      const submitBtn = document.getElementById('search-submit-btn');
+      submitBtn.disabled = true;
+
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=fi&q=${encodeURIComponent(trimmed)}`;
+        const response = await fetch(url, {
+          headers: { 'Accept-Language': 'fi' }
+        });
+        const results = await response.json();
+
+        if (results && results.length > 0) {
+          const item = results[0];
+          const lat = parseFloat(item.lat);
+          const lon = parseFloat(item.lon);
+          const isCityOrTown = ['city', 'town', 'municipality', 'administrative'].includes(item.type);
+          const zoomLevel = isCityOrTown ? 9 : 11;
+          setSearchMarker(lat, lon, panToLocation, zoomLevel);
+        } else if (trimmed.toLowerCase().includes('lippahivontie')) {
+          setSearchMarker(FALLBACK_LIPPAHIVONTIE[0], FALLBACK_LIPPAHIVONTIE[1], panToLocation, DEFAULT_ZOOM);
+        } else {
+          showToast(`Osoitetta tai paikkakuntaa "${trimmed}" ei löytynyt.`, true, 4000);
+        }
+      } catch (err) {
+        if (trimmed.toLowerCase().includes('lippahivontie')) {
+          setSearchMarker(FALLBACK_LIPPAHIVONTIE[0], FALLBACK_LIPPAHIVONTIE[1], panToLocation, DEFAULT_ZOOM);
+        } else {
+          showToast('Osoitehaku epäonnistui. Tarkista verkkoyhteys.', true, 4000);
+        }
+      } finally {
+        submitBtn.disabled = false;
+      }
+    }
+
+    const searchForm = document.getElementById('search-form');
+    const searchInput = document.getElementById('search-input');
+    const clearSearchBtn = document.getElementById('clear-search-btn');
+
+    searchForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      searchInput.blur();
+      geocodeAndPlace(searchInput.value, true);
+    });
+
+    clearSearchBtn.addEventListener('click', () => {
+      searchInput.value = '';
+      searchInput.focus();
+    });
+
+    // Pelkkä selaimen oma tarkka HTML5 Geolocation -paikannus
+    const locateBtn = document.getElementById('locate-btn');
+    let userMarker = null;
+    let accuracyCircle = null;
+
+    locateBtn.addEventListener('click', () => {
+      if (!('geolocation' in navigator)) {
+        showToast('Selaimesi ei tue paikannusta.', true);
+        return;
+      }
+
+      locateBtn.classList.add('locating');
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          locateBtn.classList.remove('locating');
+          const { latitude, longitude, accuracy } = position.coords;
+          const latlng = [latitude, longitude];
+
+          if (userMarker) map.removeLayer(userMarker);
+          if (accuracyCircle) map.removeLayer(accuracyCircle);
+
+          const icon = L.divIcon({
+            className: '',
+            html: '<div class="user-location-dot"></div>',
+            iconSize: [16, 16],
+            iconAnchor: [8, 8]
+          });
+
+          accuracyCircle = L.circle(latlng, {
+            radius: accuracy,
+            color: '#0284c7',
+            fillColor: '#38bdf8',
+            fillOpacity: 0.15,
+            weight: 1
+          }).addTo(map);
+
+          userMarker = L.marker(latlng, { icon })
+            .addTo(map)
+            .bindPopup(`<b>Oma sijainti</b><br>Tarkkuus: n. ${Math.round(accuracy)} m`)
+            .openPopup();
+
+          map.flyTo(latlng, 10, { duration: 1.0 });
+        },
+        (error) => {
+          locateBtn.classList.remove('locating');
+          let msg = 'Sijaintia ei voitu hakea.';
+          if (error.code === error.PERMISSION_DENIED) {
+            msg = 'Sijaintilupa on estetty selaimessa. Salli sijainti selaimen asetuksista.';
+          } else if (error.code === error.POSITION_UNAVAILABLE) {
+            msg = 'Laitteen sijaintitieto ei ole juuri nyt saatavilla.';
+          } else if (error.code === error.TIMEOUT) {
+            msg = 'Paikannus aikakatkaistiin. Yritä uudelleen.';
+          }
+          showToast(msg, true, 6000);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        }
+      );
+    });
+
+    // Käynnistys: asetetaan merkki oletushakuun (Lippahivontie), mutta pidetään koko Itä-Suomen zoomaus
+    geocodeAndPlace('Lippahivontie', false);
+    loadRadarFrames();
+    setTimeout(() => map.invalidateSize(), 200);
+  </script>
+</body>
+</html>
