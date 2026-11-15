@@ -30,102 +30,12 @@
       background-color: #e2e8f0;
     }
 
-    /* Yläreunan hakupalkki */
-    .search-bar-container {
+    /* Tilailmoitus yläreunassa */
+    #status-toast {
       position: fixed;
       top: 16px;
       left: 50%;
-      transform: translateX(-50%);
-      z-index: 1001;
-      width: calc(100% - 32px);
-      max-width: 480px;
-    }
-
-    .search-form {
-      display: flex;
-      align-items: center;
-      background: rgba(255, 255, 255, 0.96);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid #cbd5e1;
-      border-radius: 14px;
-      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
-      padding: 4px 6px 4px 14px;
-      gap: 6px;
-      transition: border-color 0.15s ease, box-shadow 0.15s ease;
-    }
-
-    .search-form:focus-within {
-      border-color: #0284c7;
-      box-shadow: 0 8px 24px rgba(2, 132, 199, 0.18);
-    }
-
-    .search-input {
-      flex: 1;
-      border: none;
-      background: transparent;
-      font-size: 0.95rem;
-      color: #0f172a;
-      outline: none;
-      min-width: 0;
-      padding: 8px 0;
-    }
-
-    .search-input::placeholder {
-      color: #94a3b8;
-    }
-
-    .clear-btn {
-      border: none;
-      background: transparent;
-      color: #94a3b8;
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      font-size: 1.1rem;
-      transition: background 0.15s ease, color 0.15s ease;
-    }
-
-    .clear-btn:hover {
-      background: #f1f5f9;
-      color: #334155;
-    }
-
-    .search-submit-btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      background: #0284c7;
-      color: #ffffff;
-      border: none;
-      border-radius: 10px;
-      padding: 8px 14px;
-      font-size: 0.875rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.15s ease;
-      white-space: nowrap;
-    }
-
-    .search-submit-btn:hover {
-      background: #0369a1;
-    }
-
-    .search-submit-btn:disabled {
-      opacity: 0.65;
-      cursor: wait;
-    }
-
-    /* Tilailmoitus hakupalkin alla */
-    #status-toast {
-      position: fixed;
-      top: 74px;
-      left: 50%;
-      transform: translateX(-50%) translateY(-12px);
+      transform: translateX(-50%) translateY(-20px);
       z-index: 1000;
       background: rgba(255, 255, 255, 0.96);
       backdrop-filter: blur(12px);
@@ -133,9 +43,9 @@
       border: 1px solid #cbd5e1;
       box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
       color: #0f172a;
-      padding: 9px 16px;
+      padding: 10px 18px;
       border-radius: 999px;
-      font-size: 0.85rem;
+      font-size: 0.875rem;
       font-weight: 500;
       max-width: 90vw;
       text-align: center;
@@ -391,22 +301,6 @@
 </head>
 <body>
 
-  <div class="search-bar-container">
-    <form id="search-form" class="search-form">
-      <input
-        type="text"
-        id="search-input"
-        class="search-input"
-        value="Lippahivontie"
-        placeholder="Hae osoitetta tai paikkakuntaa..."
-        aria-label="Hae osoitetta tai paikkakuntaa"
-        autocomplete="off"
-      />
-      <button type="button" id="clear-search-btn" class="clear-btn" title="Tyhjennä haku" aria-label="Tyhjennä haku">&times;</button>
-      <button type="submit" id="search-submit-btn" class="search-submit-btn">Hae</button>
-    </form>
-  </div>
-
   <div id="map"></div>
 
   <div id="status-toast" role="status" aria-live="polite"></div>
@@ -614,81 +508,6 @@
       setTimeout(() => refreshBtn.classList.remove('spinning'), 700);
     });
 
-    // Karttaneula osoite-/paikkakuntahaulle
-    const pinIcon = L.divIcon({
-      className: '',
-      html: `<div style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;background:#e11d48;border:3px solid #ffffff;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 3px 10px rgba(225,29,72,0.45);">
-               <div style="width:8px;height:8px;background:#ffffff;border-radius:50%;transform:rotate(45deg);"></div>
-             </div>`,
-      iconSize: [28, 28],
-      iconAnchor: [14, 28]
-    });
-
-    let searchMarker = null;
-    const FALLBACK_LIPPAHIVONTIE = [62.7661, 29.7470];
-
-    function setSearchMarker(lat, lon, panToLocation = true, targetZoom = 10) {
-      if (searchMarker) {
-        map.removeLayer(searchMarker);
-      }
-      searchMarker = L.marker([lat, lon], { icon: pinIcon, interactive: false }).addTo(map);
-      if (panToLocation) {
-        map.flyTo([lat, lon], targetZoom, { duration: 1.0 });
-      }
-    }
-
-    async function geocodeAndPlace(query, panToLocation = true) {
-      const trimmed = query.trim();
-      if (!trimmed) return;
-
-      const submitBtn = document.getElementById('search-submit-btn');
-      submitBtn.disabled = true;
-
-      try {
-        const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=fi&q=${encodeURIComponent(trimmed)}`;
-        const response = await fetch(url, {
-          headers: { 'Accept-Language': 'fi' }
-        });
-        const results = await response.json();
-
-        if (results && results.length > 0) {
-          const item = results[0];
-          const lat = parseFloat(item.lat);
-          const lon = parseFloat(item.lon);
-          const isCityOrTown = ['city', 'town', 'municipality', 'administrative'].includes(item.type);
-          const zoomLevel = isCityOrTown ? 9 : 11;
-          setSearchMarker(lat, lon, panToLocation, zoomLevel);
-        } else if (trimmed.toLowerCase().includes('lippahivontie')) {
-          setSearchMarker(FALLBACK_LIPPAHIVONTIE[0], FALLBACK_LIPPAHIVONTIE[1], panToLocation, DEFAULT_ZOOM);
-        } else {
-          showToast(`Osoitetta tai paikkakuntaa "${trimmed}" ei löytynyt.`, true, 4000);
-        }
-      } catch (err) {
-        if (trimmed.toLowerCase().includes('lippahivontie')) {
-          setSearchMarker(FALLBACK_LIPPAHIVONTIE[0], FALLBACK_LIPPAHIVONTIE[1], panToLocation, DEFAULT_ZOOM);
-        } else {
-          showToast('Osoitehaku epäonnistui. Tarkista verkkoyhteys.', true, 4000);
-        }
-      } finally {
-        submitBtn.disabled = false;
-      }
-    }
-
-    const searchForm = document.getElementById('search-form');
-    const searchInput = document.getElementById('search-input');
-    const clearSearchBtn = document.getElementById('clear-search-btn');
-
-    searchForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      searchInput.blur();
-      geocodeAndPlace(searchInput.value, true);
-    });
-
-    clearSearchBtn.addEventListener('click', () => {
-      searchInput.value = '';
-      searchInput.focus();
-    });
-
     // Pelkkä selaimen oma tarkka HTML5 Geolocation -paikannus
     const locateBtn = document.getElementById('locate-btn');
     let userMarker = null;
@@ -753,8 +572,7 @@
       );
     });
 
-    // Käynnistys: asetetaan merkki oletushakuun (Lippahivontie), mutta pidetään koko Itä-Suomen zoomaus
-    geocodeAndPlace('Lippahivontie', false);
+    // Käynnistys
     loadRadarFrames();
     setTimeout(() => map.invalidateSize(), 200);
   </script>
