@@ -513,7 +513,7 @@
     let userMarker = null;
     let accuracyCircle = null;
 
-    locateBtn.addEventListener('click', () => {
+    function locateUser(targetZoom = DEFAULT_ZOOM, openPopupOnLocate = false) {
       if (!('geolocation' in navigator)) {
         showToast('Selaimesi ei tue paikannusta.', true);
         return;
@@ -547,10 +547,13 @@
 
           userMarker = L.marker(latlng, { icon })
             .addTo(map)
-            .bindPopup(`<b>Oma sijainti</b><br>Tarkkuus: n. ${Math.round(accuracy)} m`)
-            .openPopup();
+            .bindPopup(`<b>Oma sijainti</b><br>Tarkkuus: n. ${Math.round(accuracy)} m`);
 
-          map.flyTo(latlng, 10, { duration: 1.0 });
+          if (openPopupOnLocate) {
+            userMarker.openPopup();
+          }
+
+          map.flyTo(latlng, targetZoom, { duration: 1.0 });
         },
         (error) => {
           locateBtn.classList.remove('locating');
@@ -570,10 +573,15 @@
           maximumAge: 0
         }
       );
+    }
+
+    locateBtn.addEventListener('click', () => {
+      locateUser(DEFAULT_ZOOM, true);
     });
 
-    // Käynnistys
+    // Käynnistys: ladataan tutkakuvat ja käynnistetään automaattinen paikannus Itä-Suomen zoomauksella
     loadRadarFrames();
+    locateUser(DEFAULT_ZOOM, false);
     setTimeout(() => map.invalidateSize(), 200);
   </script>
 </body>
